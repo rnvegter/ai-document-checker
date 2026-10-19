@@ -4,83 +4,150 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI Document Checker</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="top">
-    <h1>AI Document Checker</h1>
-    <p class="sub">Spots AI-sounding writing in English and Dutch, then suggests more human rewrites.</p>
-  </header>
-
-  <main class="layout">
-    <section class="doc">
-      <div class="toolbar">
-        <label class="btn ghost">
-          Upload .docx / .txt
-          <input id="file" type="file" accept=".docx,.txt,.md,.markdown" hidden>
-        </label>
-        <select id="lang" aria-label="Document language">
-          <option value="auto">Language: auto</option>
-          <option value="en">English</option>
-          <option value="nl">Nederlands</option>
-        </select>
-        <span class="spacer"></span>
-        <button id="edit" class="btn ghost" hidden>Edit text</button>
-        <button id="check" class="btn">Check</button>
-        <button id="deep" class="btn accent" title="Needs ANTHROPIC_API_KEY on the server">Deep check with Claude</button>
+  <div class="app">
+    <nav class="sidebar" id="sidebar">
+      <div class="brand">
+        <img src="icon.svg" alt="" width="28" height="28">
+        <span>AI Document Checker</span>
+        <button id="menuToggle" class="menu-toggle" aria-label="Menu" aria-expanded="false">☰</button>
       </div>
-
-      <textarea id="input" spellcheck="true" placeholder="Paste or type a document here…"></textarea>
-      <div id="view" class="view" hidden></div>
-
-      <div class="legend" id="legend" hidden>
-        <span><mark class="m-phrase"></mark>AI phrase</span>
-        <span><mark class="m-transition"></mark>Stock transition</span>
-        <span><mark class="m-dash"></mark>Em dash</span>
-        <span><mark class="m-parallel"></mark>“Not X but Y”</span>
-        <span><mark class="m-claude"></mark>Flagged by Claude</span>
-      </div>
-      <p class="hint" id="stats"></p>
-    </section>
-
-    <aside class="panel">
-      <div id="empty" class="card muted">
-        Paste a document and press <b>Check</b> for an instant offline scan.
-        <b>Deep check</b> adds Claude's judgement, rewrites and writing feedback.
-      </div>
-
-      <div id="heur" class="card" hidden>
-        <div class="score-row">
-          <div class="gauge" id="heurGauge"><span id="heurScore">0</span></div>
-          <div>
-            <h2>Heuristic score</h2>
-            <p class="muted" id="heurVerdict"></p>
-          </div>
+      <div class="nav-links" id="navLinks">
+        <a href="#/new" class="nav-new">+ New check</a>
+        <a href="#/check" data-route="check">Checker</a>
+        <a href="#/history" data-route="history">History <span class="count" id="historyCount"></span></a>
+        <a href="#/about" data-route="about">How it works</a>
+        <div class="nav-recent">
+          <h4>Recent</h4>
+          <ul id="recent"></ul>
         </div>
-        <ul class="signals" id="signals"></ul>
-        <p class="caveat">Pattern-based signals only. Formal, templated or non-native writing can score high without any AI involved.</p>
+        <div class="nav-foot" id="status"></div>
       </div>
+    </nav>
 
-      <div id="claude" class="card" hidden>
-        <div class="score-row">
-          <div class="gauge" id="claudeGauge"><span id="claudeScore">0</span></div>
-          <div>
-            <h2>Claude's assessment</h2>
-            <p class="verdict" id="claudeVerdict"></p>
-          </div>
+    <main class="main">
+      <!-- Checker -->
+      <section id="view-check" class="view-page">
+        <header class="page-head">
+          <input id="title" class="title-input" placeholder="Untitled document" aria-label="Document title">
+          <span class="saved muted" id="savedNote"></span>
+        </header>
+
+        <div class="layout">
+          <section class="doc">
+            <div class="toolbar">
+              <label class="btn ghost">
+                Upload .docx / .txt
+                <input id="file" type="file" accept=".docx,.txt,.md,.markdown" hidden>
+              </label>
+              <select id="lang" aria-label="Document language">
+                <option value="auto">Language: auto</option>
+                <option value="en">English</option>
+                <option value="nl">Nederlands</option>
+              </select>
+              <span class="spacer"></span>
+              <button id="edit" class="btn ghost" hidden>Edit text</button>
+              <button id="check" class="btn">Check</button>
+              <button id="deep" class="btn accent">Deep check with Claude</button>
+            </div>
+
+            <textarea id="input" spellcheck="true" placeholder="Paste or type a document here…"></textarea>
+            <div id="view" class="view" hidden></div>
+
+            <div class="legend" id="legend" hidden>
+              <span><mark class="m-phrase"></mark>AI phrase</span>
+              <span><mark class="m-transition"></mark>Stock transition</span>
+              <span><mark class="m-dash"></mark>Em dash</span>
+              <span><mark class="m-parallel"></mark>“Not X but Y”</span>
+              <span><mark class="m-claude"></mark>Flagged by Claude</span>
+            </div>
+            <p class="hint" id="stats"></p>
+          </section>
+
+          <aside class="panel">
+            <div id="empty" class="card muted">
+              Paste a document and press <b>Check</b> for an instant scan.
+              <b>Deep check</b> adds Claude's judgement, rewrites and writing feedback.
+              Every check is saved to <a href="#/history">History</a> in this browser.
+            </div>
+
+            <div id="heur" class="card" hidden>
+              <div class="score-row">
+                <div class="gauge" id="heurGauge"><span id="heurScore">0</span></div>
+                <div>
+                  <h2>Heuristic score</h2>
+                  <p class="muted" id="heurVerdict"></p>
+                </div>
+              </div>
+              <ul class="signals" id="signals"></ul>
+              <p class="caveat">Pattern-based signals only. Formal, templated or non-native writing can score high without any AI involved.</p>
+            </div>
+
+            <div id="claude" class="card" hidden>
+              <div class="score-row">
+                <div class="gauge" id="claudeGauge"><span id="claudeScore">0</span></div>
+                <div>
+                  <h2>Claude's assessment</h2>
+                  <p class="verdict" id="claudeVerdict"></p>
+                </div>
+              </div>
+              <p id="claudeSummary"></p>
+              <div id="strengths"></div>
+              <h3>AI-sounding passages</h3>
+              <ol class="items" id="passages"></ol>
+              <h3>Writing feedback</h3>
+              <ol class="items" id="feedback"></ol>
+              <p class="muted small" id="claudeModel"></p>
+            </div>
+
+            <div id="error" class="card error" hidden></div>
+          </aside>
         </div>
-        <p id="claudeSummary"></p>
-        <div id="strengths"></div>
-        <h3>AI-sounding passages</h3>
-        <ol class="items" id="passages"></ol>
-        <h3>Writing feedback</h3>
-        <ol class="items" id="feedback"></ol>
-        <p class="muted small" id="claudeModel"></p>
-      </div>
+      </section>
 
-      <div id="error" class="card error" hidden></div>
-    </aside>
-  </main>
+      <!-- History -->
+      <section id="view-history" class="view-page" hidden>
+        <header class="page-head">
+          <h1>History</h1>
+          <span class="spacer"></span>
+          <input id="historySearch" type="search" placeholder="Search…" aria-label="Search history">
+          <button id="historyExport" class="btn ghost">Export</button>
+          <button id="historyClear" class="btn ghost danger">Clear all</button>
+        </header>
+        <p class="muted small">Saved in this browser only. Nothing is stored on the server.</p>
+        <ul class="history" id="historyList"></ul>
+        <p class="muted" id="historyEmpty" hidden>No checks yet. <a href="#/new">Start one</a>.</p>
+      </section>
+
+      <!-- About -->
+      <section id="view-about" class="view-page prose" hidden>
+        <h1>How it works</h1>
+        <p>The checker looks at a document in two ways.</p>
+        <h2>1. Instant check</h2>
+        <p>Runs in your browser and scores eight signals that often show up in AI-generated English and Dutch text:</p>
+        <ul>
+          <li><b>Stock phrases</b> such as “delve”, “plays a crucial role”, “in het huidige digitale landschap”.</li>
+          <li><b>Uniform sentence length.</b> People write unevenly; models tend to keep a steady rhythm.</li>
+          <li><b>Stock transitions</b> such as “Moreover”, “Furthermore”, “Bovendien”, “Daarnaast”.</li>
+          <li><b>Em dashes</b>, used far more by models than by most writers.</li>
+          <li><b>“Not X, but Y”</b> constructions and <b>lists of three</b>.</li>
+          <li><b>Uniform paragraphs</b> and <b>chatbot formatting</b> (bold-label bullets, markdown headings).</li>
+        </ul>
+        <h2>2. Deep check with Claude</h2>
+        <p>Sends the text to Claude, which judges how likely it is to be AI-written, quotes the passages that give it away,
+          proposes rewrites in the document's own language and reviews clarity, structure, tone, concision and grammar.</p>
+        <h2>Limits</h2>
+        <p>No AI detector is reliable. Formal, templated or non-native writing can look machine-made, and edited AI text can
+          look human. Use the result to improve a text, not as proof about who wrote it.</p>
+        <h2>Privacy</h2>
+        <p>History stays in this browser. The instant check never leaves your device. A deep check sends the text to the
+          Anthropic API through this app's server, which does not store it.</p>
+      </section>
+    </main>
+  </div>
 
   <div id="tip" class="tip" hidden></div>
   <script type="module" src="app.js"></script>

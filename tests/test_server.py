@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 import sys
@@ -129,6 +130,46 @@ class HttpTests(unittest.TestCase):
     def test_extract_endpoint(self):
         status, data = self.post("/api/extract", make_docx(["Hoi."]), {"X-Filename": "x.docx"})
         self.assertEqual((status, data["text"]), (200, "Hoi."))
+
+
+class AuthTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        server.Handler.password = "s3cret"
+        server.Handler.log_message = lambda *a: None
+        cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
+        cls.base = f"http://127.0.0.1:{cls.httpd.server_address[1]}"
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        server.Handler.password = None
+
+    def status(self, path, password=None, method="GET"):
+        req = urllib.request.Request(self.base + path, method=method, data=b"{}" if method == "POST" else None)
+        if password is not None:
+            req.add_header("Authorization", "Basic " + base64.b64encode(f"user:{password}".encode()).decode())
+        try:
+            with urllib.request.urlopen(req) as r:
+                return r.status, dict(r.headers)
+        except urllib.error.HTTPError as e:
+            return e.code, dict(e.headers)
+
+    def test_requires_password(self):
+        status, headers = self.status("/")
+        self.assertEqual(status, 401)
+        self.assertIn("Basic", headers["WWW-Authenticate"])
+        self.assertEqual(self.status("/", "wrong")[0], 401)
+        self.assertEqual(self.status("/api/review", method="POST")[0], 401)
+
+    def test_correct_password(self):
+        status, headers = self.status("/index.html", "s3cret")
+        self.assertEqual(status, 200)
+        self.assertIn("default-src 'self'", headers["Content-Security-Policy"])
+
+    def test_healthz_is_open(self):
+        self.assertEqual(self.status("/healthz")[0], 200)
 
 
 if __name__ == "__main__":

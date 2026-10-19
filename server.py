@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-"""Local web server for the AI document checker.
+"""Web server for the AI document checker.
 
-Serves the page in ./static and two JSON endpoints:
+Serves the app in ./static and these endpoints:
   POST /api/review   deep check with Claude (needs ANTHROPIC_API_KEY)
   POST /api/extract  plain text from an uploaded .docx/.txt/.md file
+  GET  /api/health   whether Claude is configured
+  GET  /healthz      liveness probe for hosting platforms (no password)
+
+Set APP_PASSWORD to put the whole app behind a password.
 """
 import argparse
+import base64
+import binascii
+import hmac
 import io
 import json
 import os
@@ -15,6 +22,7 @@ import zipfile
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlsplit
 from xml.etree import ElementTree
 
 import anthropic
@@ -168,11 +176,50 @@ def extract_text(filename, data):
     raise ReviewError(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, "Upload a .docx, .txt or .md file.")
 
 
+CSP = (
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+    "object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+)
+
+
 class Handler(SimpleHTTPRequestHandler):
     client = None
+    password = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(STATIC_DIR), **kwargs)
+
+    def end_headers(self):
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", CSP)
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
+    def authorized(self):
+        if not self.password:
+            return True
+        header = self.headers.get("Authorization", "")
+        if not header.startswith("Basic "):
+            return False
+        try:
+            _, _, given = base64.b64decode(header[6:], validate=True).decode().partition(":")
+        except (binascii.Error, UnicodeDecodeError):
+            return False
+        return hmac.compare_digest(given.encode(), self.password.encode())
+
+    def require_auth(self):
+        """Send a 401 and return False unless the request carries the app password."""
+        if self.authorized():
+            return True
+        body = b"Password required"
+        self.send_response(HTTPStatus.UNAUTHORIZED)
+        self.send_header("WWW-Authenticate", 'Basic realm="AI Document Checker", charset="UTF-8"')
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+        return False
 
     def send_json(self, status, payload):
         body = json.dumps(payload).encode()
@@ -189,16 +236,29 @@ class Handler(SimpleHTTPRequestHandler):
         return self.rfile.read(length)
 
     def do_GET(self):
-        if self.path == "/api/health":
+        path = urlsplit(self.path).path
+        if path == "/healthz":
+            self.send_json(HTTPStatus.OK, {"ok": True})
+            return
+        if not self.require_auth():
+            return
+        if path == "/api/health":
             self.send_json(HTTPStatus.OK, {"claude": self.client is not None, "model": MODEL})
             return
         super().do_GET()
 
+    def do_HEAD(self):
+        if self.require_auth():
+            super().do_HEAD()
+
     def do_POST(self):
+        if not self.require_auth():
+            return
+        path = urlsplit(self.path).path
         try:
-            if self.path == "/api/review":
+            if path == "/api/review":
                 self.handle_review()
-            elif self.path == "/api/extract":
+            elif path == "/api/extract":
                 self.handle_extract()
             else:
                 self.send_json(HTTPStatus.NOT_FOUND, {"error": "Not found"})
@@ -230,16 +290,20 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run the AI document checker web page.")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8000)
+    parser = argparse.ArgumentParser(description="Run the AI document checker web app.")
+    parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"))
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", "8000")))
     args = parser.parse_args()
+
+    Handler.password = os.environ.get("APP_PASSWORD") or None
 
     client = anthropic.Anthropic()
     if client.api_key or client.auth_token or client.credentials:
         Handler.client = client
     else:
         print("No Anthropic credentials found: running with offline heuristics only.", file=sys.stderr)
+    if Handler.client and not Handler.password and args.host not in ("127.0.0.1", "localhost"):
+        print("Warning: anyone who can reach this server can use your Claude API key. Set APP_PASSWORD.", file=sys.stderr)
 
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"AI checker running on http://{args.host}:{args.port}")
