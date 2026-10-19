@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Document Checker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <h1>AI Document Checker</h1>
+    <p class="sub">Spots AI-sounding writing in English and Dutch, then suggests more human rewrites.</p>
+  </header>
+
+  <main class="layout">
+    <section class="doc">
+      <div class="toolbar">
+        <label class="btn ghost">
+          Upload .docx / .txt
+          <input id="file" type="file" accept=".docx,.txt,.md,.markdown" hidden>
+        </label>
+        <select id="lang" aria-label="Document language">
+          <option value="auto">Language: auto</option>
+          <option value="en">English</option>
+          <option value="nl">Nederlands</option>
+        </select>
+        <span class="spacer"></span>
+        <button id="edit" class="btn ghost" hidden>Edit text</button>
+        <button id="check" class="btn">Check</button>
+        <button id="deep" class="btn accent" title="Needs ANTHROPIC_API_KEY on the server">Deep check with Claude</button>
+      </div>
+
+      <textarea id="input" spellcheck="true" placeholder="Paste or type a document here…"></textarea>
+      <div id="view" class="view" hidden></div>
+
+      <div class="legend" id="legend" hidden>
+        <span><mark class="m-phrase"></mark>AI phrase</span>
+        <span><mark class="m-transition"></mark>Stock transition</span>
+        <span><mark class="m-dash"></mark>Em dash</span>
+        <span><mark class="m-parallel"></mark>“Not X but Y”</span>
+        <span><mark class="m-claude"></mark>Flagged by Claude</span>
+      </div>
+      <p class="hint" id="stats"></p>
+    </section>
+
+    <aside class="panel">
+      <div id="empty" class="card muted">
+        Paste a document and press <b>Check</b> for an instant offline scan.
+        <b>Deep check</b> adds Claude's judgement, rewrites and writing feedback.
+      </div>
+
+      <div id="heur" class="card" hidden>
+        <div class="score-row">
+          <div class="gauge" id="heurGauge"><span id="heurScore">0</span></div>
+          <div>
+            <h2>Heuristic score</h2>
+            <p class="muted" id="heurVerdict"></p>
+          </div>
+        </div>
+        <ul class="signals" id="signals"></ul>
+        <p class="caveat">Pattern-based signals only. Formal, templated or non-native writing can score high without any AI involved.</p>
+      </div>
+
+      <div id="claude" class="card" hidden>
+        <div class="score-row">
+          <div class="gauge" id="claudeGauge"><span id="claudeScore">0</span></div>
+          <div>
+            <h2>Claude's assessment</h2>
+            <p class="verdict" id="claudeVerdict"></p>
+          </div>
+        </div>
+        <p id="claudeSummary"></p>
+        <div id="strengths"></div>
+        <h3>AI-sounding passages</h3>
+        <ol class="items" id="passages"></ol>
+        <h3>Writing feedback</h3>
+        <ol class="items" id="feedback"></ol>
+        <p class="muted small" id="claudeModel"></p>
+      </div>
+
+      <div id="error" class="card error" hidden></div>
+    </aside>
+  </main>
+
+  <div id="tip" class="tip" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
