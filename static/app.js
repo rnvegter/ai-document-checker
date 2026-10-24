@@ -399,6 +399,7 @@ function exportHistory() {
 function renderNav(route = currentRoute()) {
   const all = checks.list();
   $("historyCount").textContent = all.length || "";
+  $("recent").parentElement.hidden = !all.length;
   $("recent").innerHTML = all
     .slice(0, 6)
     .map((e) => `<li><a href="#/check/${e.id}" class="${state.id === e.id && route === "check" ? "active" : ""}"><span>${escapeHtml(e.title)}</span></a></li>`)
