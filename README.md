@@ -7,6 +7,7 @@ reviews them with Claude, and produces a clean version without AI traces.
 - [Requirements](#requirements)
 - [Quick start](#quick-start)
 - [Installation](#installation)
+- [Installing on Proxmox VE](docs/PROXMOX.md)
 - [Configuration](#configuration)
 - [Updating](#updating)
 - [Day-to-day commands](#day-to-day-commands)
@@ -130,7 +131,13 @@ Put it behind HTTPS before exposing it to the internet; see [HTTPS and reverse p
 
 3. Open <http://localhost:8000>.
 
-### Option 3: Python without Docker
+### Option 3: Proxmox VE
+
+See the separate [Proxmox installation manual](docs/PROXMOX.md). It covers an LXC container with Docker
+(recommended), a virtual machine with Docker, and a lightweight LXC container without Docker, plus updates,
+snapshots, backups and HTTPS.
+
+### Option 4: Python without Docker
 
 ```bash
 git clone https://github.com/rnvegter/ai-document-checker.git
@@ -356,4 +363,5 @@ Project structure:
 | `static/app.js` | Menu and routing, checker, cleaning, history page. |
 | `static/style.css` | Colours, layout and themes. |
 | `Dockerfile`, `docker-compose.yml`, `.env.example` | Deployment. |
+| `docs/PROXMOX.md` | Installation manual for Proxmox VE. |
 | `tests/` | Python and JavaScript tests. |
