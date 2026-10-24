@@ -1,58 +1,88 @@
 # AI Document Checker
 
-A self-contained web app that checks English and Dutch documents for AI-sounding writing and suggests more human rewrites.
+A self-contained web app that checks Word, PowerPoint and text documents (English and Dutch) for AI-sounding writing,
+reviews them, and produces a clean version without AI traces.
 
-- **Checker:** paste text or upload a `.docx`, `.txt` or `.md` file.
-  - **Check** runs instantly in the browser with no API key. It scores eight signals and highlights them in the text:
-    stock AI phrases ("delve", "plays a crucial role", "in het huidige digitale landschap"), uniform sentence length,
-    stock transitions ("Moreover", "Bovendien"), em dashes, "not X but Y" constructions, lists of three,
-    uniform paragraphs and chatbot formatting.
-  - **Deep check with Claude** needs an Anthropic API key on the server. Claude judges how likely the text is AI-written,
-    flags passages with a reason and a rewrite in the document's own language, and gives feedback on clarity, structure,
-    tone, concision and grammar. **Apply rewrite** swaps a passage into your text.
-- **History:** every check is saved automatically. You can search, reopen, rename (edit the title), delete or export to JSON.
-  History lives in each visitor's browser (localStorage). Nothing is stored on the server.
-- **Menu:** a sidebar with New check, Checker, History, How it works and your most recent documents.
-  It collapses into a ☰ menu on phones.
+## What it does
 
-Neither check is proof. Formal, templated or non-native writing can look machine-made, and edited AI text can look human.
-Use the result to improve a text, not as a verdict on a person.
+- **Read documents:** paste text, or upload `.docx`, `.pptx`, `.txt` or `.md`.
+  For PowerPoint it reads slide text, tables and speaker notes, marked per slide.
+- **Check (instant):** runs in the browser with no API key. It scores eight signals and highlights them:
+  stock AI phrases ("delve", "plays a crucial role", "in het huidige digitale landschap"), uniform sentence length,
+  stock transitions ("Moreover", "Bovendien"), em dashes, "not X but Y" constructions, lists of three,
+  uniform paragraphs and chatbot formatting.
+- **Deep check with Claude:** Claude judges how likely the text is AI-written, flags passages with a reason and a
+  rewrite, and reviews clarity, structure, tone, concision and grammar. **Apply rewrite** swaps a passage into your text.
+- **Clean document:** removes the traces of AI and gives you a clean file in the same format.
+  - Claude rewrites every paragraph that reads as machine-written, in the document's own language, keeping every fact,
+    name, number, date, reference and legal wording. It never merges or splits paragraphs.
+  - A `.docx` or `.pptx` keeps its layout, styles, tables, headers and speaker notes. Within a rewritten paragraph the
+    formatting of the first run is applied to the whole paragraph, so check paragraphs that mixed bold text or links.
+  - Invisible zero-width characters are removed everywhere.
+  - File metadata: author and "last modified by" are reset (or set to `CLEAN_AUTHOR`), the comments field is cleared,
+    and custom properties that tag the file as AI-made (Copilot, GPT, "GeneratedBy", "AI_…") are removed.
+    Sensitivity labels and other organisational properties are kept.
+  - The cleaned version is saved as a new history entry next to the original, with a before/after score.
+    If you edited the text after uploading, the result is a `.txt` file instead.
+- **History:** every check is saved automatically in the browser (localStorage). You can search, reopen, rename,
+  delete and export it. Nothing is stored on the server.
 
-## Run locally
+No AI detector is reliable. Formal, templated or non-native writing can look machine-made, and edited AI text can look
+human. Use the scores to improve a text, not as a verdict on a person.
+
+## Configuration (.env)
+
+All settings come from a `.env` file. Start from the example:
 
 ```bash
-pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...   # optional; without it only the instant check works
-python server.py                  # open http://127.0.0.1:8000
+cp .env.example .env
 ```
-
-## Deploy
-
-The app is one small Python process with a single dependency (`anthropic`), packaged as a Docker image.
-
-```bash
-cd ai-document-checker
-docker build -t ai-checker .
-docker run -p 8000:8000 -e ANTHROPIC_API_KEY=sk-ant-... -e APP_PASSWORD=choose-one ai-checker
-```
-
-On a hosting platform (Render, Railway, Fly.io, Google Cloud Run, a VPS):
-
-1. Point the service at this repository. It builds from the `Dockerfile` in the root.
-2. Set the environment variables below. Store the API key as a secret.
-3. Use `/healthz` as the health-check path. It answers without a password.
-
-The platform's HTTPS is needed when you set a password, because basic auth sends it with every request.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | none | Enables the deep check. Without it the instant check still works. |
-| `APP_PASSWORD` | none | Puts the whole app behind a browser password prompt (any username). **Set this on any public URL**, or anyone can spend your Claude credit. |
-| `PORT` | `8000` | Port to listen on. Most platforms set this for you. |
-| `HOST` | `0.0.0.0` in Docker, `127.0.0.1` otherwise | Interface to bind. |
-| `AI_CHECKER_MODEL` | `claude-opus-5-5` | Claude model for the deep check. |
+| `ANTHROPIC_API_KEY` | none | Enables Deep check and Clean document. Without it only the instant check works. |
+| `AI_CHECKER_MODEL` | `claude-opus-5-5` | Claude model. |
+| `AI_CHECKER_EFFORT` | `medium` | `low`, `medium`, `high`, `xhigh` or `max`. Higher is slower and costs more. |
+| `APP_PASSWORD` | none | Browser password prompt for the whole app (any username). **Set it on every public deployment.** |
+| `CLEAN_AUTHOR` | empty | Author written into cleaned files. Empty clears the author field. |
+| `CLEAN_CONCURRENCY` | `4` | How many parts of a long document are rewritten in parallel. |
+| `MAX_UPLOAD_MB` | `20` | Largest upload. |
+| `MAX_DOCUMENT_CHARS` | `200000` | Most characters of text per document for Claude. |
+| `PUBLISH_PORT` | `8000` | Port on the host that Docker Compose publishes. |
+| `HOST`, `PORT` | `127.0.0.1`, `8000` | Only used when running `server.py` directly. |
 
-Documents sent to the deep check go to the Anthropic API through the server. The server does not log or store them.
+Real environment variables take precedence over `.env`. Never commit `.env`; it is in `.gitignore` and `.dockerignore`.
+
+## Run with Docker
+
+```bash
+cp .env.example .env      # then edit it
+docker compose up -d --build
+```
+
+Open `http://localhost:8000` (or the `PUBLISH_PORT` you chose). Stop with `docker compose down`.
+
+Without Compose:
+
+```bash
+docker build -t ai-document-checker .
+docker run -d -p 8000:8000 --env-file .env -e HOST=0.0.0.0 -e PORT=8000 ai-document-checker
+```
+
+On a hosting platform (Render, Railway, Fly.io, Google Cloud Run, a VPS), deploy from this repository's `Dockerfile`,
+enter the variables from `.env.example` in the platform's settings (the API key as a secret), and use `/healthz` as
+the health-check path; it answers without a password. Use the platform's HTTPS when you set a password.
+
+Cleaning a long document makes several Claude calls and can take a few minutes, so allow long request timeouts on
+your proxy or platform.
+
+## Run without Docker
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env      # then edit it
+python server.py          # open http://127.0.0.1:8000
+```
 
 ## Tests
 
@@ -63,8 +93,9 @@ python -m unittest discover -s tests
 
 ## Files
 
-- `static/heuristics.js`: offline signals, phrase lists (EN/NL) and scoring weights. Tune them here.
-- `static/history.js`: browser-side history storage.
-- `static/app.js`: menu and routing, the checker, the history page.
-- `server.py`: serves the app, password protection, Claude review (`/api/review`), `.docx` extraction (`/api/extract`).
-- `Dockerfile`: production image (runs as a non-root user, with a health check).
+- `server.py`: web server, settings, password protection, Claude review and cleaning.
+- `documents.py`: reads and writes `.docx`, `.pptx` and text, rewrites paragraphs in place and scrubs metadata.
+- `static/heuristics.js`: instant-check signals, phrase lists (EN/NL) and weights. Tune them here.
+- `static/history.js`: browser-side history.
+- `static/app.js`: menu and routing, checker, cleaning, history page.
+- `Dockerfile`, `docker-compose.yml`, `.env.example`: deployment.
