@@ -133,7 +133,14 @@ Put it behind HTTPS before exposing it to the internet; see [HTTPS and reverse p
 
 ### Option 3: Proxmox VE
 
-See the separate [Proxmox installation manual](docs/PROXMOX.md). It covers an LXC container with Docker
+One line in the Proxmox host shell creates a Debian LXC container with Docker and the app:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/rnvegter/ai-document-checker/main/scripts/proxmox-install.sh)"
+```
+
+The [Proxmox installation manual](docs/PROXMOX.md) explains the questions it asks and how to run it without
+questions. It also covers manual installation: an LXC container with Docker
 (recommended), a virtual machine with Docker, and a lightweight LXC container without Docker, plus updates,
 snapshots, backups and HTTPS.
 
@@ -364,4 +371,5 @@ Project structure:
 | `static/style.css` | Colours, layout and themes. |
 | `Dockerfile`, `docker-compose.yml`, `.env.example` | Deployment. |
 | `docs/PROXMOX.md` | Installation manual for Proxmox VE. |
+| `scripts/proxmox-install.sh` | One-line installer for Proxmox VE. |
 | `tests/` | Python and JavaScript tests. |

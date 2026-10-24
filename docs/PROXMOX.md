@@ -1,6 +1,53 @@
 # Installing on Proxmox VE
 
-This guide installs the AI Document Checker on Proxmox VE 8 or 9. Pick one of three setups:
+This guide installs the AI Document Checker on Proxmox VE 8 or 9.
+
+## Quick install (one line)
+
+Run this in the **Proxmox host** shell (Datacenter → your node → Shell) as root:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/rnvegter/ai-document-checker/main/scripts/proxmox-install.sh)"
+```
+
+It sets up [setup A](#a-lxc-container-with-docker-recommended) for you: an unprivileged Debian LXC container with
+Docker, the app, a `.env` file and automatic start at boot. It asks a few questions; press Enter to accept a default:
+
+| Question | Default |
+|---|---|
+| Container ID | next free ID |
+| Hostname | `ai-checker` |
+| Storage for the disk | `local-lvm`, `local-zfs` or the first suitable storage |
+| Disk, CPU cores, memory | 8 GB, 2 cores, 2048 MB |
+| Network bridge and IP | `vmbr0`, DHCP (or a static address such as `192.168.1.50/24` plus gateway) |
+| Port | `8000` |
+| Anthropic API key | none (optional; typing is hidden) |
+| App password | a random one, shown at the end (typing is hidden) |
+
+All input is checked before anything is created. At the end it shows the address, the password and the command to
+update later. It takes about 5 minutes, mostly Debian updates and the Docker build.
+
+Like any script you pipe from the internet, read it first if you want to know what it does:
+[`scripts/proxmox-install.sh`](../scripts/proxmox-install.sh).
+
+**Without questions:** set any answer as an environment variable and add `AIC_YES=1` to accept defaults for the
+rest, for example:
+
+```bash
+AIC_YES=1 AIC_CTID=120 AIC_IP=192.168.1.50/24 AIC_GATEWAY=192.168.1.1 \
+ANTHROPIC_API_KEY=sk-ant-... APP_PASSWORD=choose-one \
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/rnvegter/ai-document-checker/main/scripts/proxmox-install.sh)"
+```
+
+The full list of variables is at the top of the script. A key typed on the command line ends up in your shell
+history; use the questions instead if that matters.
+
+If the installer stops with an error, it tells you which container it created so you can inspect or remove it.
+To update an installed copy, use the [update commands](#updating).
+
+## Manual installation
+
+Prefer to do it by hand, or want a VM? Pick one of three setups:
 
 | Setup | Best for | Notes |
 |---|---|---|
