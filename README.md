@@ -18,10 +18,20 @@ reviews them, and produces a clean version without AI traces.
     name, number, date, reference and legal wording. It never merges or splits paragraphs.
   - A `.docx` or `.pptx` keeps its layout, styles, tables, headers and speaker notes. Within a rewritten paragraph the
     formatting of the first run is applied to the whole paragraph, so check paragraphs that mixed bold text or links.
-  - Invisible zero-width characters are removed everywhere.
-  - File metadata: author and "last modified by" are reset (or set to `CLEAN_AUTHOR`), the comments field is cleared,
-    and custom properties that tag the file as AI-made (Copilot, GPT, "GeneratedBy", "AI_…") are removed.
+  - **Hidden characters:** zero-width characters, text-direction controls, Unicode "tag" characters (which can hide
+    whole messages), variation selectors and unusual spaces are removed everywhere, including paragraphs that were not
+    rewritten. Look-alike Cyrillic or Greek letters inside Latin words, and fullwidth or "styled" letters (𝐀, Ａ),
+    become normal letters. Real Greek or Cyrillic words, Dutch accents, `ĳ` and emoji are left alone.
+  - **Image metadata:** embedded JPEG, PNG and WebP images lose their EXIF, XMP, IPTC, C2PA content credentials and
+    comments, without being re-encoded (same pixels, same quality). EXIF stays on a photo that needs it to display
+    the right way up.
+  - **File metadata:** author and "last modified by" are reset (or set to `CLEAN_AUTHOR`), the comments field is
+    cleared, and custom properties that tag the file as AI-made (Copilot, GPT, "GeneratedBy", "AI_…") are removed.
     Sensitivity labels and other organisational properties are kept.
+  - **Report:** after cleaning, the app lists every hidden trace it removed and where.
+  - **Not covered:** statistical watermarks hidden in word choice (such as SynthID-Text) can't be detected here.
+    Rewriting usually weakens them, but nothing guarantees they are gone, especially in paragraphs left unchanged.
+    Pixel-level watermarks in images are not touched.
   - The cleaned version is saved as a new history entry next to the original, with a before/after score.
     If you edited the text after uploading, the result is a `.txt` file instead.
 - **History:** every check is saved automatically in the browser (localStorage). You can search, reopen, rename,
@@ -95,6 +105,7 @@ python -m unittest discover -s tests
 
 - `server.py`: web server, settings, password protection, Claude review and cleaning.
 - `documents.py`: reads and writes `.docx`, `.pptx` and text, rewrites paragraphs in place and scrubs metadata.
+- `traces.py`: removes hidden characters, look-alike letters and image metadata.
 - `static/heuristics.js`: instant-check signals, phrase lists (EN/NL) and weights. Tune them here.
 - `static/history.js`: browser-side history.
 - `static/app.js`: menu and routing, checker, cleaning, history page.

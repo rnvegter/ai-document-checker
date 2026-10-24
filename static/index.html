@@ -109,6 +109,8 @@
               <h2>Clean document ready</h2>
               <p id="cleanedSummary"></p>
               <button id="cleanedDownload" class="btn accent"></button>
+              <h3>Hidden traces removed</h3>
+              <ul class="traces" id="cleanedTraces"></ul>
               <p class="muted small" id="cleanedNote"></p>
             </div>
 
@@ -154,10 +156,17 @@
           its layout, styles, tables and speaker notes. The clean file also has:</p>
         <ul>
           <li>no em dashes, stock phrases, formulaic transitions or chatbot formatting;</li>
-          <li>no invisible zero-width characters;</li>
+          <li>no hidden characters: zero-width characters, text-direction controls, hidden “tag” characters,
+            variation selectors and unusual spaces are removed, and look-alike Cyrillic or Greek letters inside
+            Latin words and fullwidth or “styled” letters are replaced with normal ones;</li>
+          <li>images keep their exact pixels but lose their metadata: EXIF, XMP, IPTC, C2PA content credentials and
+            comments (EXIF stays when a photo needs it to display the right way up);</li>
           <li>author and “last modified by” reset (or set to the name configured on the server), document comments
             field cleared, and custom properties that tag the file as AI-made removed. Sensitivity labels stay.</li>
         </ul>
+        <p>After cleaning, the app lists every hidden trace it removed. Statistical watermarks hidden in word
+          choice cannot be detected here; rewriting usually weakens them, but there is no guarantee they are gone,
+          especially in paragraphs that were left unchanged.</p>
         <p>Inside a rewritten paragraph the formatting of its first word is applied to the whole paragraph, so check
           paragraphs that mixed bold or links before sharing the file.</p>
         <h2>Limits</h2>

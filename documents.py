@@ -6,12 +6,15 @@ units in place, so Word and PowerPoint files keep their layout and styles.
 import io
 import re
 import zipfile
+from collections import Counter
 from dataclasses import dataclass, field
 
 from docx import Document as open_docx
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from lxml import etree
 from pptx import Presentation
+
+from traces import scrub_text, strip_image_metadata
 
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
@@ -23,9 +26,6 @@ MIME = {
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "txt": "text/plain; charset=utf-8",
 }
-
-# Zero-width and other invisible characters that some generators leave behind.
-INVISIBLE = re.compile("[​‌‍⁠﻿]")
 
 # Custom document properties that tag a file as AI-made. Kept narrow on purpose:
 # sensitivity labels (MSIP_Label_*) and other organisational properties stay.
@@ -78,7 +78,7 @@ class Document:
         changed = 0
         for uid, text in rewrites.items():
             unit = by_id.get(uid)
-            text = INVISIBLE.sub("", text or "").strip()
+            text = (text or "").strip()
             if not unit or not text or text == unit.text:
                 continue
             unit.text = text
@@ -94,21 +94,50 @@ class Document:
         return changed
 
     def scrub(self, author=""):
-        """Remove invisible characters and AI traces from the file's metadata."""
+        """Remove hidden traces and return a report of what was found.
+
+        The report is a list of {"label", "count", "detail"} entries: hidden and
+        look-alike characters in the text, AI metadata and image metadata.
+        """
+        counts = Counter()
         for u in self.units:
-            u.text = INVISIBLE.sub("", u.text)
-            for node in u.nodes:
-                if node.text:
-                    node.text = INVISIBLE.sub("", node.text)
+            if u.nodes:
+                for node in u.nodes:
+                    if node.text:
+                        node.text, found = scrub_text(node.text)
+                        counts.update(found)
+                u.text = "".join(node.text or "" for node in u.nodes)
+            else:
+                u.text, found = scrub_text(u.text)
+                counts.update(found)
+        report = [{"label": label, "count": n, "detail": ""} for label, n in counts.items()]
         if self.kind == "txt":
-            return
+            return report
+
         props = self._obj.core_properties
+        old = [v for v in (props.author, props.last_modified_by) if v and v != author]
+        if old:
+            report.append({"label": "Author fields reset", "count": len(old), "detail": ", ".join(dict.fromkeys(old))})
+        if props.comments:
+            report.append({"label": "Document comments field cleared", "count": 1, "detail": props.comments[:80]})
         props.author = author
         props.last_modified_by = author
         props.comments = ""
+
+        images = []
         for part in self._obj.part.package.iter_parts():
-            if str(part.partname) == "/docProps/custom.xml":
-                _scrub_custom_properties(part)
+            name = str(part.partname)
+            if name == "/docProps/custom.xml":
+                removed = _scrub_custom_properties(part)
+                if removed:
+                    report.append({"label": "AI document properties", "count": len(removed), "detail": ", ".join(removed)})
+            elif part.content_type.startswith("image/"):
+                part._blob, removed = strip_image_metadata(part.blob)
+                if removed:
+                    images.append(f"{name.rsplit('/', 1)[-1]} ({', '.join(removed)})")
+        if images:
+            report.append({"label": "Image metadata", "count": len(images), "detail": "; ".join(images)})
+        return report
 
     def save(self):
         if self.kind == "txt":
@@ -120,12 +149,15 @@ class Document:
 
 def _scrub_custom_properties(part):
     root = part._element if hasattr(part, "_element") else etree.fromstring(part.blob)
+    removed = []
     for prop in list(root):
         if AI_PROPERTY.search(prop.get("name", "")):
+            removed.append(prop.get("name"))
             root.remove(prop)
     if not hasattr(part, "_element"):
         # Generic parts keep their raw bytes; python-docx/pptx expose no setter.
         part._blob = etree.tostring(root, xml_declaration=True, encoding="UTF-8", standalone=True)
+    return removed
 
 
 def _own_nodes(paragraph, tag, keep=lambda node: True):

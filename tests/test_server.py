@@ -56,7 +56,7 @@ class CleanTests(unittest.TestCase):
     def test_cleans_pptx_in_place(self):
         client = fake_client(rewrite=humanize)
         doc = documents.load("deck.pptx", make_pptx())
-        self.assertEqual(server.clean_document(client, doc), 1)
+        self.assertEqual(server.clean_document(client, doc)[0], 1)
         texts = [u.text for u in documents.load("deck.pptx", doc.save()).units]
         self.assertIn("Teams work better together.", texts)
         self.assertIn("Budget: €40,000", texts)
@@ -67,7 +67,7 @@ class CleanTests(unittest.TestCase):
         paras = [f"Paragraph {i} " + "x" * 3000 for i in range(10)]
         client = fake_client(rewrite=lambda t: t.replace("x", "y"))
         doc = documents.load("long.docx", make_docx(paras))
-        self.assertEqual(server.clean_document(client, doc), 10)
+        self.assertEqual(server.clean_document(client, doc)[0], 10)
         self.assertGreater(len(client.beta.messages.calls), 1)
         self.assertTrue(all("x" not in u.text for u in doc.units))
 

@@ -260,14 +260,16 @@ def _rewrite_chunk(client, units):
 
 
 def clean_document(client, doc):
-    """Rewrite AI-sounding paragraphs in place and scrub metadata. Returns the number changed."""
+    """Rewrite AI-sounding paragraphs in place and remove hidden traces.
+
+    Returns (number of paragraphs rewritten, report of traces removed).
+    """
     rewrites = {}
     with ThreadPoolExecutor(max_workers=max(1, CLEAN_CONCURRENCY)) as pool:
         for part in pool.map(lambda chunk: _rewrite_chunk(client, chunk), list(_chunks(doc.units))):
             rewrites.update(part)
     changed = doc.apply(rewrites)
-    doc.scrub(CLEAN_AUTHOR)
-    return changed
+    return changed, doc.scrub(CLEAN_AUTHOR)
 
 
 def load_document(filename, data):
@@ -411,7 +413,7 @@ class Handler(SimpleHTTPRequestHandler):
                 HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
                 f"The document has {size:,} characters; the limit is {MAX_CHARS:,}. Split it up.",
             )
-        changed = clean_document(self.client, doc)
+        changed, traces = clean_document(self.client, doc)
         self.send_json(HTTPStatus.OK, {
             "filename": doc.clean_filename,
             "mime": doc.mime,
@@ -420,6 +422,7 @@ class Handler(SimpleHTTPRequestHandler):
             "kind": doc.kind,
             "changed": changed,
             "total": len(doc.units),
+            "traces": traces,
         })
 
 

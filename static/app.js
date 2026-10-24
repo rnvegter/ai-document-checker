@@ -310,6 +310,11 @@ async function cleanDocument() {
       `${data.changed} of ${data.total} paragraphs rewritten` +
       (before === null ? "." : `. Instant score ${before} → ${state.heur.score}.`);
     $("cleanedDownload").textContent = `Download ${data.filename}`;
+    $("cleanedTraces").innerHTML = (data.traces || []).length
+      ? data.traces
+          .map((t) => `<li>${escapeHtml(t.label)}: ${t.count}${t.detail ? `<span class="detail">${escapeHtml(t.detail)}</span>` : ""}</li>`)
+          .join("")
+      : "<li class='muted'>No hidden characters or AI metadata found.</li>";
     $("cleanedNote").textContent =
       [editedNote, data.kind === "txt" ? "" : "Layout, styles and metadata cleanup applied. Review the file before sharing it."]
         .filter(Boolean)

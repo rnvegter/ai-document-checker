@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY server.py documents.py ./
+COPY server.py documents.py traces.py ./
 COPY static ./static
 
 RUN useradd --create-home app
