@@ -21,9 +21,9 @@ Use the result to improve a text, not as a verdict on a person.
 ## Run locally
 
 ```bash
-pip install -r ai_checker/requirements.txt
+pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...   # optional; without it only the instant check works
-python ai_checker/server.py           # open http://127.0.0.1:8000
+python server.py                  # open http://127.0.0.1:8000
 ```
 
 ## Deploy
@@ -31,14 +31,14 @@ python ai_checker/server.py           # open http://127.0.0.1:8000
 The app is one small Python process with a single dependency (`anthropic`), packaged as a Docker image.
 
 ```bash
-cd ai_checker
+cd ai-document-checker
 docker build -t ai-checker .
 docker run -p 8000:8000 -e ANTHROPIC_API_KEY=sk-ant-... -e APP_PASSWORD=choose-one ai-checker
 ```
 
 On a hosting platform (Render, Railway, Fly.io, Google Cloud Run, a VPS):
 
-1. Point the service at this repository and set the **root directory** to `ai_checker` so it uses the `Dockerfile` there.
+1. Point the service at this repository. It builds from the `Dockerfile` in the root.
 2. Set the environment variables below. Store the API key as a secret.
 3. Use `/healthz` as the health-check path. It answers without a password.
 
@@ -57,8 +57,8 @@ Documents sent to the deep check go to the Anthropic API through the server. The
 ## Tests
 
 ```bash
-node --test ai_checker/tests/heuristics.test.mjs ai_checker/tests/history.test.mjs
-python -m unittest discover -s ai_checker/tests
+node --test tests/heuristics.test.mjs tests/history.test.mjs
+python -m unittest discover -s tests
 ```
 
 ## Files
