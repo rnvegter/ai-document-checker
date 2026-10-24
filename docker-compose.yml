@@ -1,0 +1,12 @@
+services:
+  ai-checker:
+    build: .
+    image: ai-document-checker
+    env_file: .env
+    environment:
+      # Inside the container the app always listens on 0.0.0.0:8000.
+      HOST: 0.0.0.0
+      PORT: "8000"
+    ports:
+      - "${PUBLISH_PORT:-8000}:8000"
+    restart: unless-stopped

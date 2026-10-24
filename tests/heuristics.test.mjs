@@ -46,6 +46,13 @@ test("spans point at the right text and never overlap", () => {
   assert.ok(r.spans.some((s) => AI_EN.slice(s.start, s.end).toLowerCase() === "it is important to note"));
 });
 
+test("slide markers are not counted as text", () => {
+  const plain = analyze("Quarterly plan\n\nTeams work better together.");
+  const deck = analyze("[Slide 1]\n\nQuarterly plan\n\nTeams work better together.");
+  assert.equal(deck.sentences, plain.sentences);
+  assert.equal(deck.words, plain.words);
+});
+
 test("short or empty input does not crash", () => {
   assert.equal(analyze("").score, 0);
   assert.equal(analyze("Hello there.").confidence, "low");

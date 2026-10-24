@@ -3,7 +3,8 @@ import { createHistory, titleFor } from "./history.js";
 
 const $ = (id) => document.getElementById(id);
 const checks = createHistory(safeLocalStorage());
-const state = { id: null, heur: null, claude: null };
+// file: the uploaded file and the text extracted from it; cleaned: the last clean result
+const state = { id: null, heur: null, claude: null, file: null, cleaned: null };
 
 const VERDICTS = {
   likely_human: "Likely human-written",
@@ -206,6 +207,9 @@ function resetChecker() {
   state.id = null;
   state.heur = null;
   state.claude = null;
+  state.file = null;
+  state.cleaned = null;
+  $("cleaned").hidden = true;
   $("input").value = "";
   $("title").value = "";
   $("title").placeholder = "Untitled document";
@@ -260,6 +264,64 @@ async function deepCheck() {
   }
 }
 
+const base64ToBlob = (b64, type) => new Blob([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], { type });
+
+function downloadBlob(blob, filename) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// Rewrite the document without AI traces. An uploaded Word/PowerPoint file is
+// cleaned in its own format as long as the text was not edited after upload.
+async function cleanDocument() {
+  const text = $("input").value;
+  if (!text.trim()) return;
+  showError("");
+  const fromFile = state.file && state.file.text === text;
+  const title = $("title").value.trim() || $("title").placeholder || "document";
+  const name = fromFile ? state.file.name : `${title.replace(/[\\/:*?"<>|]+/g, " ").trim() || "document"}.txt`;
+  const before = runHeuristics({ save: false }) ? state.heur.score : null;
+  const btn = $("clean");
+  btn.disabled = true;
+  btn.textContent = "Cleaning…";
+  try {
+    const res = await fetch("api/clean", {
+      method: "POST",
+      headers: { "X-Filename": encodeURIComponent(name) },
+      body: fromFile ? state.file.blob : new Blob([text], { type: "text/plain" }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    const blob = base64ToBlob(data.file, data.mime);
+    const editedNote = state.file && !fromFile ? "The text was edited after upload, so the result is a text file." : "";
+
+    // The cleaned version becomes a new history entry; the original stays as it was.
+    resetChecker();
+    state.file = { name: data.filename, blob, text: data.text };
+    state.cleaned = { blob, filename: data.filename };
+    $("input").value = data.text;
+    $("title").value = `${title} (clean)`;
+    runHeuristics();
+    $("cleaned").hidden = false;
+    $("cleanedSummary").textContent =
+      `${data.changed} of ${data.total} paragraphs rewritten` +
+      (before === null ? "." : `. Instant score ${before} → ${state.heur.score}.`);
+    $("cleanedDownload").textContent = `Download ${data.filename}`;
+    $("cleanedNote").textContent =
+      [editedNote, data.kind === "txt" ? "" : "Layout, styles and metadata cleanup applied. Review the file before sharing it."]
+        .filter(Boolean)
+        .join(" ");
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    btn.disabled = !serverHasClaude;
+    btn.textContent = "Clean document";
+  }
+}
+
 function applyRewrite(idx) {
   const p = state.claude.passages[idx];
   const text = $("input").value;
@@ -277,12 +339,13 @@ async function upload(file) {
     if (/\.(txt|md|markdown)$/i.test(file.name)) {
       text = await file.text();
     } else {
-      const res = await fetch("api/extract", { method: "POST", headers: { "X-Filename": file.name }, body: file });
+      const res = await fetch("api/extract", { method: "POST", headers: { "X-Filename": encodeURIComponent(file.name) }, body: file });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
       text = data.text;
     }
     resetChecker();
+    state.file = { name: file.name, blob: file, text };
     $("input").value = text;
     $("title").value = file.name.replace(/\.[^.]+$/, "");
     runHeuristics();
@@ -323,11 +386,7 @@ function renderHistory() {
 
 function exportHistory() {
   const blob = new Blob([checks.exportJson()], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `ai-checker-history-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  downloadBlob(blob, `ai-checker-history-${new Date().toISOString().slice(0, 10)}.json`);
 }
 
 // ---------- Navigation ----------
@@ -370,6 +429,8 @@ function show(page) {
 
 $("check").addEventListener("click", () => runHeuristics());
 $("deep").addEventListener("click", deepCheck);
+$("clean").addEventListener("click", cleanDocument);
+$("cleanedDownload").addEventListener("click", () => state.cleaned && downloadBlob(state.cleaned.blob, state.cleaned.filename));
 $("edit").addEventListener("click", () => showView(false));
 $("lang").addEventListener("change", () => state.heur && runHeuristics());
 $("file").addEventListener("change", (e) => {
@@ -435,10 +496,10 @@ fetch("api/health")
   .then((h) => {
     serverHasClaude = h.claude;
     $("status").textContent = h.claude ? `Claude: ${h.model}` : "Claude: not configured";
-    if (!h.claude) $("deep").title = "Set ANTHROPIC_API_KEY on the server to enable Claude";
+    if (!h.claude) $("deep").title = $("clean").title = "Set ANTHROPIC_API_KEY on the server to enable Claude";
   })
   .catch(() => ($("status").textContent = "Server not reachable"))
-  .finally(() => ($("deep").disabled = !serverHasClaude));
+  .finally(() => ($("deep").disabled = $("clean").disabled = !serverHasClaude));
 
 if (!safeLocalStorage()) $("savedNote").textContent = "History is unavailable in this browser";
 route();

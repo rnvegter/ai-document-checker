@@ -40,8 +40,8 @@
           <section class="doc">
             <div class="toolbar">
               <label class="btn ghost">
-                Upload .docx / .txt
-                <input id="file" type="file" accept=".docx,.txt,.md,.markdown" hidden>
+                Upload Word / PowerPoint / text
+                <input id="file" type="file" accept=".docx,.pptx,.txt,.md,.markdown" hidden>
               </label>
               <select id="lang" aria-label="Document language">
                 <option value="auto">Language: auto</option>
@@ -52,6 +52,7 @@
               <button id="edit" class="btn ghost" hidden>Edit text</button>
               <button id="check" class="btn">Check</button>
               <button id="deep" class="btn accent">Deep check with Claude</button>
+              <button id="clean" class="btn accent">Clean document</button>
             </div>
 
             <textarea id="input" spellcheck="true" placeholder="Paste or type a document here…"></textarea>
@@ -69,8 +70,9 @@
 
           <aside class="panel">
             <div id="empty" class="card muted">
-              Paste a document and press <b>Check</b> for an instant scan.
+              Paste a document or upload a Word or PowerPoint file and press <b>Check</b> for an instant scan.
               <b>Deep check</b> adds Claude's judgement, rewrites and writing feedback.
+              <b>Clean document</b> rewrites it without AI traces and gives you a clean file.
               Every check is saved to <a href="#/history">History</a> in this browser.
             </div>
 
@@ -101,6 +103,13 @@
               <h3>Writing feedback</h3>
               <ol class="items" id="feedback"></ol>
               <p class="muted small" id="claudeModel"></p>
+            </div>
+
+            <div id="cleaned" class="card cleaned" hidden>
+              <h2>Clean document ready</h2>
+              <p id="cleanedSummary"></p>
+              <button id="cleanedDownload" class="btn accent"></button>
+              <p class="muted small" id="cleanedNote"></p>
             </div>
 
             <div id="error" class="card error" hidden></div>
@@ -139,6 +148,18 @@
         <h2>2. Deep check with Claude</h2>
         <p>Sends the text to Claude, which judges how likely it is to be AI-written, quotes the passages that give it away,
           proposes rewrites in the document's own language and reviews clarity, structure, tone, concision and grammar.</p>
+        <h2>3. Clean document</h2>
+        <p>Rewrites every paragraph that reads as machine-written, in the document's own language, while keeping every
+          fact, name, number and legal wording. You get the result in the same format: a Word or PowerPoint file keeps
+          its layout, styles, tables and speaker notes. The clean file also has:</p>
+        <ul>
+          <li>no em dashes, stock phrases, formulaic transitions or chatbot formatting;</li>
+          <li>no invisible zero-width characters;</li>
+          <li>author and “last modified by” reset (or set to the name configured on the server), document comments
+            field cleared, and custom properties that tag the file as AI-made removed. Sensitivity labels stay.</li>
+        </ul>
+        <p>Inside a rewritten paragraph the formatting of its first word is applied to the whole paragraph, so check
+          paragraphs that mixed bold or links before sharing the file.</p>
         <h2>Limits</h2>
         <p>No AI detector is reliable. Formal, templated or non-native writing can look machine-made, and edited AI text can
           look human. Use the result to improve a text, not as proof about who wrote it.</p>

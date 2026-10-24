@@ -142,7 +142,9 @@ function findAll(re, text, make) {
   return spans;
 }
 
-export function analyze(text, lang = "auto") {
+export function analyze(source, lang = "auto") {
+  // Blank out PowerPoint [Slide n] markers; same length keeps highlight offsets valid.
+  const text = source.replace(/^\[Slide \d+(?: notes)?\]$/gm, (m) => " ".repeat(m.length));
   const language = lang === "auto" ? detectLanguage(text) : lang;
   const words = wordCount(text);
   const per1k = (n) => (words ? (n * 1000) / words : 0);

@@ -247,3 +247,7 @@ mark.flash { outline: 2px solid var(--accent); }
   z-index: 10;
 }
 .tip b { display: block; }
+
+.cleaned { border-color: var(--low); }
+.cleaned h2 { margin-bottom: 6px; }
+.cleaned .btn { margin: 4px 0 8px; }
